@@ -1,0 +1,95 @@
+# ==============================================================================
+# System & Hardware Settings
+# ==============================================================================
+enable_modelarts: False
+device_target: "GPU"
+device_id: 0
+run_distribute: False
+num_parallel_workers: 4
+enable_profiling: False
+
+# ==============================================================================
+# Data & Path Settings
+# ==============================================================================
+data_path: "./data/VOC2007"
+output_path: "./output"
+checkpoint_path: "./checkpoint/"
+checkpoint_file_path: ""
+mindrecord_dir: "MindRecord_SSD_Mobile"
+voc_root: "./data/VOC2007"
+voc_json: "annotations/voc_instances_val.json"
+dataset: "voc"
+
+# ==============================================================================
+# Model Architecture (SSD + MobileNetV2)
+# ==============================================================================
+model_name: "ssd_mobilenet_v2"
+img_shape: [300, 300]
+num_ssd_boxes: 1917            # Correct for MobileNetV2
+num_classes: 3
+classes: ['background', 'Normal', 'Defective']
+
+# MobileNetV2 Neck Configuration
+extras_in_channels: [256, 576, 1280, 512, 256, 256]
+extras_out_channels: [576, 1280, 512, 256, 256, 128]
+extras_strides: [1, 1, 2, 2, 2, 2]
+extras_ratio: [0.2, 0.2, 0.2, 0.25, 0.5, 0.25]
+num_default: [3, 6, 6, 6, 6, 6]
+feature_size: [19, 10, 5, 3, 2, 1]
+
+# Feature map scaling
+min_scale: 0.2
+max_scale: 0.95
+aspect_ratios: [[], [2, 3], [2, 3], [2, 3], [2, 3], [2, 3]]
+steps: [16, 32, 64, 100, 150, 300]
+prior_scaling: [0.1, 0.2]
+
+# ==============================================================================
+# VGG16 "Ghost" Flags (STOPS THE IMPORT CRASH)
+# ==============================================================================
+pretrain_vgg_bn: False        # <--- Fixes the current AttributeError
+ssd_vgg_bn: False             
+base_out_channels: [64, 64, 128, 128, 256, 256, 256, 512, 512, 512, 512, 512, 512, 1024, 1024]
+
+# ==============================================================================
+# Training Hyperparameters
+# ==============================================================================
+batch_size: 32
+epoch_size: 500
+lr_init: 0.001
+lr: 0.05
+lr_end_rate: 0.001
+warmup_epochs: 2
+momentum: 0.9
+weight_decay: 0.00015
+loss_scale: 1024
+gamma: 2.0                     
+alpha: 0.75                    
+
+# Logic & Thresholds
+match_threshold: 0.5
+nms_threshold: 0.6
+min_score: 0.1
+max_boxes: 100
+all_reduce_fusion_config: [29, 58, 89]
+
+# ==============================================================================
+# Control Flags
+# ==============================================================================
+use_float16: True
+only_create_dataset: False
+mode_sink: "no_sink"
+save_checkpoint: True
+save_checkpoint_epochs: 10
+keep_checkpoint_max: 10
+run_eval: False
+filter_weight: False
+freeze_layer: "none"
+loss_log_interval: 10
+pre_trained: ""
+pre_trained_epoch_size: 0
+feature_extractor_base_param: ""
+
+# Export
+file_name: "ssd_mobilenet"
+file_format: 'MINDIR'

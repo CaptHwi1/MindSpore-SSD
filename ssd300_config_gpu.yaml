@@ -21,15 +21,17 @@ voc_json: "annotations/voc_instances_val.json"
 dataset: "voc"
 
 # ==============================================================================
-# Model Architecture (SSD + MobileNetV2)
+# Model Architecture: SSD300 + MobileNetV2
 # ==============================================================================
-model_name: "ssd_mobilenet_v2"
+model_name: "ssd300"
 img_shape: [300, 300]
-num_ssd_boxes: 1917            # Correct for MobileNetV2
+# 1917 is the mathematical anchor count for MobileNetV2-SSD (300x300)
+num_ssd_boxes: 1917            
 num_classes: 3
 classes: ['background', 'Normal', 'Defective']
 
-# MobileNetV2 Neck Configuration
+# MobileNetV2 Backbone Geometry
+# These layers use Depthwise Separable Convolutions (group = input_channels)
 extras_in_channels: [256, 576, 1280, 512, 256, 256]
 extras_out_channels: [576, 1280, 512, 256, 256, 128]
 extras_strides: [1, 1, 2, 2, 2, 2]
@@ -37,7 +39,7 @@ extras_ratio: [0.2, 0.2, 0.2, 0.25, 0.5, 0.25]
 num_default: [3, 6, 6, 6, 6, 6]
 feature_size: [19, 10, 5, 3, 2, 1]
 
-# Feature map scaling
+# Prior Box / Anchor parameters
 min_scale: 0.2
 max_scale: 0.95
 aspect_ratios: [[], [2, 3], [2, 3], [2, 3], [2, 3], [2, 3]]
@@ -45,10 +47,10 @@ steps: [16, 32, 64, 100, 150, 300]
 prior_scaling: [0.1, 0.2]
 
 # ==============================================================================
-# VGG16 "Ghost" Flags (STOPS THE IMPORT CRASH)
+# Compatibility "Ghost" Flags (Satisfies VGG imports)
 # ==============================================================================
-pretrain_vgg_bn: False        # <--- Fixes the current AttributeError
-ssd_vgg_bn: False             
+pretrain_vgg_bn: False
+ssd_vgg_bn: False
 base_out_channels: [64, 64, 128, 128, 256, 256, 256, 512, 512, 512, 512, 512, 512, 1024, 1024]
 
 # ==============================================================================

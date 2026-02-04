@@ -1,37 +1,16 @@
 # ==============================================================================
-# System & Hardware Settings
+# SSD300 + MobileNetV2 Configuration (Frugal Factory Defect Detection)
 # ==============================================================================
-enable_modelarts: False
-device_target: "GPU"
-device_id: 0
-run_distribute: False
-num_parallel_workers: 4
-enable_profiling: False
-
-# ==============================================================================
-# Data & Path Settings
-# ==============================================================================
-data_path: "./data/VOC2007"
-output_path: "./output"
-checkpoint_path: "./checkpoint/"
-checkpoint_file_path: ""
-mindrecord_dir: "MindRecord_SSD_Mobile"
-voc_root: "./data/VOC2007"
-voc_json: "annotations/voc_instances_val.json"
-dataset: "voc"
-
-# ==============================================================================
-# Model Architecture: SSD300 + MobileNetV2
+# Model Architecture
 # ==============================================================================
 model_name: "ssd300"
+backbone: "mobilenet_v2"
 img_shape: [300, 300]
-# 1917 is the mathematical anchor count for MobileNetV2-SSD (300x300)
-num_ssd_boxes: 1917            
 num_classes: 3
 classes: ['background', 'Normal', 'Defective']
+num_ssd_boxes: -1  # Auto-computed at runtime
 
 # MobileNetV2 Backbone Geometry
-# These layers use Depthwise Separable Convolutions (group = input_channels)
 extras_in_channels: [256, 576, 1280, 512, 256, 256]
 extras_out_channels: [576, 1280, 512, 256, 256, 128]
 extras_strides: [1, 1, 2, 2, 2, 2]
@@ -39,59 +18,105 @@ extras_ratio: [0.2, 0.2, 0.2, 0.25, 0.5, 0.25]
 num_default: [3, 6, 6, 6, 6, 6]
 feature_size: [19, 10, 5, 3, 2, 1]
 
-# Prior Box / Anchor parameters
+# Prior Box / Anchor Parameters (FIXED: first layer must have aspect ratio)
 min_scale: 0.2
 max_scale: 0.95
-aspect_ratios: [[], [2, 3], [2, 3], [2, 3], [2, 3], [2, 3]]
+aspect_ratios: [[2], [2, 3], [2, 3], [2, 3], [2, 3], [2, 3]]  # CRITICAL FIX: was [] for first layer
 steps: [16, 32, 64, 100, 150, 300]
 prior_scaling: [0.1, 0.2]
 
 # ==============================================================================
-# Compatibility "Ghost" Flags (Satisfies VGG imports)
+# System & Hardware Settings
 # ==============================================================================
-pretrain_vgg_bn: False
-ssd_vgg_bn: False
-base_out_channels: [64, 64, 128, 128, 256, 256, 256, 512, 512, 512, 512, 512, 512, 1024, 1024]
+enable_modelarts: True  # Set False for local debugging
+device_target: "GPU"
+device_id: 0
+run_distribute: False
+device_num: 1
+num_parallel_workers: 8
+enable_profiling: False
+mode_sink: "sink"  # "sink" for GPU speed, "no_sink" for debugging
 
 # ==============================================================================
-# Training Hyperparameters
+# Data & Path Settings (AUTO-RESOLVED BY train.py)
 # ==============================================================================
-batch_size: 32
-epoch_size: 500
-lr_init: 0.001
-lr: 0.05
-lr_end_rate: 0.001
-warmup_epochs: 2
+# ModelArts paths (NVMe cache - FASTEST)
+coco_root: "/cache/dataset/coco"
+mindrecord_dir: "/cache/dataset/mindrecord"
+mindrecord_file: "coco_train"
+output_path: "/cache/train_out"
+checkpoint_path: "/cache/train_out/checkpoint/"
+
+# Local fallback paths (uncomment when enable_modelarts=False)
+# coco_root: "/home/user/datasets/frugal_factory/coco"
+# mindrecord_dir: "/home/user/datasets/frugal_factory/mindrecord"
+# output_path: "./output"
+# checkpoint_path: "./output/checkpoint/"
+
+# Dataset configuration
+dataset: "coco"
+annotation_file: "annotations/instances_train2017.json"
+eval_annotation: "annotations/instances_val2017.json"
+eval_mindrecord_file: "coco_val"
+
+# ModelArts OBS integration (REQUIRED)
+data_url: "obs://frugal-factory-dataset/input"  # OBS path to raw images
+train_url: "obs://frugal-factory-dataset/output"      # YOUR OBS bucket for checkpoints
+pre_trained: ""                                # Path to mobilenetv2.ckpt (optional)
+
+# ==============================================================================
+# Training Hyperparameters (MobileNetV2 Optimized)
+# ==============================================================================
+batch_size: 24
+epoch_size: 150
+lr_init: 0.002
+lr_end: 2.0e-5
+lr_warmup_epochs: 3
+lr_decay_mode: "cosine"
 momentum: 0.9
-weight_decay: 0.00015
+weight_decay: 0.0004
 loss_scale: 1024
-gamma: 2.0                     
-alpha: 0.75                    
 
-# Logic & Thresholds
+# Loss configuration
+gamma: 2.0
+alpha: 0.75
 match_threshold: 0.5
-nms_threshold: 0.6
-min_score: 0.1
-max_boxes: 100
-all_reduce_fusion_config: [29, 58, 89]
+use_focal_loss: True
 
 # ==============================================================================
-# Control Flags
+# Inference Settings
+# ==============================================================================
+nms_threshold: 0.45
+min_score: 0.3
+max_boxes: 50
+
+# ==============================================================================
+# Checkpoint & Evaluation
+# ==============================================================================
+save_checkpoint: True
+save_checkpoint_epochs: 5
+keep_checkpoint_max: 20
+run_eval: True
+eval_interval: 5
+eval_start_epoch: 5
+
+# ==============================================================================
+# Precision & Memory
 # ==============================================================================
 use_float16: True
-only_create_dataset: False
-mode_sink: "no_sink"
-save_checkpoint: True
-save_checkpoint_epochs: 10
-keep_checkpoint_max: 10
-run_eval: False
-filter_weight: False
-freeze_layer: "none"
-loss_log_interval: 10
-pre_trained: ""
-pre_trained_epoch_size: 0
-feature_extractor_base_param: ""
+freeze_layer: "none"  # Options: "none", "backbone"
 
+# ==============================================================================
+# Debug Flags
+# ==============================================================================
+only_create_dataset: False
+loss_log_interval: 50
+pre_trained_epoch_size: 0
+filter_weight: False
+checkpoint_filter_list: []  # For VGG→MobileNet conversion (not needed here)
+
+# ==============================================================================
 # Export
-file_name: "ssd_mobilenet"
-file_format: 'MINDIR'
+# ==============================================================================
+file_name: "ssd300_mobilenetv2_frugal_factory"
+file_format: "MINDIR"
